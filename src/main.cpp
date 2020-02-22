@@ -44,7 +44,14 @@ void resetEncoder(int bytes) {
  
 void writeEncoderData() {
   cli();
-  Wire.write(value);
+  char message[4];
+  message[3] = (value >> 24) & 0xFF;
+  message[2] = (value >> 16) & 0xFF;
+  message[1] = (value >> 8) & 0xFF;
+  message[0] = value & 0xFF;  
+
+  Wire.write(message);
+
   sei();
 }
 
