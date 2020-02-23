@@ -1,23 +1,21 @@
 #include <Arduino.h>
 #include "avr/interrupt.h"
 #include <Wire.h>
+#include <Encoder.h>
 
 #define I2C_ADDRESS 0x10
 
-volatile int value = 0;
+volatile long value = 0;
 volatile int lastEncoded = 0;
 
 volatile int zeroValue = 0;
+
+Encoder encoder(3, 4);
 
 void writeEncoderData();
 void resetEncoder(int bytes);
 
 void setup() {
-  pinMode(3, INPUT);
-  pinMode(4, INPUT);
-  digitalWrite(3, HIGH);
-  digitalWrite(4, HIGH);
-
   Wire.begin(I2C_ADDRESS);
   Wire.onRequest(writeEncoderData);
   Wire.onReceive(resetEncoder);
@@ -43,40 +41,12 @@ void resetEncoder(int bytes) {
 }
  
 void writeEncoderData() {
-  cli();
-  char message[5];
+  union longToBytes {
+    long value;
+    char buffer[4];
+  } converter;
 
-  int valueSend = abs(value);
+  converter.value = encoder.read();
 
-  message[3] = (valueSend >> 24) & 0xFF;
-  message[2] = (valueSend >> 16) & 0xFF;
-  message[1] = (valueSend >> 8) & 0xFF;
-  message[0] = valueSend & 0xFF;  
-
-  message[4] = value < 0;
-
-  Wire.write(message);
-
-  sei();
+  Wire.write(converter.buffer);
 }
-
-ISR(PCINT0_vect) {
-  int MSB = digitalRead(3); //MSB = most significant bit
-  int LSB = digitalRead(4); //LSB = least significant bit
- 
-  int encoded = (MSB << 1) |LSB;            //converting the 2 pin value to single number
-  int sum  = (lastEncoded << 2) | encoded;  //adding it to the previous encoded value
- 
-  if(sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011) {
-    value++;
-  }
-
-  if(sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000) {
-    value--;
-  }
-
-  value -= zeroValue;
-
-  lastEncoded = encoded; //store this value for next time
-}
-
